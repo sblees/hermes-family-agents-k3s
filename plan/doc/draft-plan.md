@@ -157,11 +157,22 @@ These standards define concrete locations and patterns to ensure consistency and
   - `hermes.family/member: <name>`
   - `hermes.agent/id: <agent-name>`
 
-### 9.5 Resource Defaults (Initial)
-- Keep agents lightweight:
-  - CPU request: 500m
-  - Memory request: 1Gi
-  - Allow vertical scaling later based on observed usage
+### 9.5 Resource Defaults (Initial) — 25 GB Total Budget
+
+**Global Constraint:** Plan for a **maximum of ~25 GB RAM** total across all agents + inference endpoint + system overhead.
+
+**Recommended Starting Allocations:**
+
+| Component              | Memory Request | Memory Limit | CPU Request | Notes |
+|------------------------|----------------|--------------|-------------|-------|
+| Inference endpoint     | 8–12 Gi        | 14 Gi        | 4–6         | Local models will be the largest consumer |
+| Each Hermes agent      | 1.5–2 Gi       | 3 Gi         | 500m–1      | Conservative but functional |
+| **Max recommended agents** | —           | —            | —           | **Start with 2–4 agents** until usage is measured |
+
+**Rationale:**
+- Leaves comfortable headroom within the 25 GB total budget
+- Prevents any single agent from starving the inference workload
+- Conservative limits make it easier to add more agents later if actual usage is lower than expected
 
 ---
 
