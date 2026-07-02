@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: filesystem-mcp
+  namespace: mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: filesystem-mcp
+  template:
+    metadata:
+      labels:
+        app: filesystem-mcp
+    spec:
+      containers:
+        - name: mcp
+          image: mcp/filesystem:latest   # placeholder
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1.5Gi"
+              cpu: "500m"

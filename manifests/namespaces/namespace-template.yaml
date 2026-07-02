@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hermes-REPLACE_ME
+  labels:
+    hermes.family/member: REPLACE_ME
+    app.kubernetes.io/name: hermes-namespace
