@@ -110,21 +110,21 @@ Keep MCP usage minimal. Do not introduce a central MCP orchestration layer.
 - Aligns with strong per-agent isolation
 - Keeps the system flexible for future capabilities
 
-## 8. Inference Configuration (Hermes-visible)
+## 8. Inference Configuration (Remote Only)
 
-Hermes expects a custom provider named `local-openrouter` defined in its configuration. All model calls are made against this provider.
+These Hermes agents will **not** use local inference or local models. All inference will be remote (OpenRouter, Grok, etc.), routed through **LiteLLM**.
 
-**Required Configuration (from current Hermes setup):**
-- Provider name: `local-openrouter`
-- Base URL: Points to an OpenAI-compatible endpoint (currently `http://127.0.0.1:4200/v1`)
-- Default model alias: `openrouter-primary`
-- Additional model aliases used internally: `openrouter-compact`, `openrouter-summary`, `openrouter-title`, `openrouter-browser-validation`
-- Fallback provider support (currently configured for `xai-oauth` / Grok)
+**Hermes-visible Configuration:**
+- Provider name: `local-openrouter` (kept for compatibility with existing Hermes config)
+- Base URL: Points to the internal LiteLLM Kubernetes Service (e.g. `http://litellm.inference.svc.cluster.local:4000/v1`)
+- Model aliases remain the same: `openrouter-primary`, `openrouter-compact`, `openrouter-summary`, etc.
+- Fallback behavior is handled inside LiteLLM (no changes required in Hermes)
 
-**Kubernetes Implications:**
-- Each agent pod must have access to an equivalent `local-openrouter` endpoint.
-- The endpoint can be provided via a Kubernetes Service, external hostname, or sidecar.
-- API keys and model routing details remain encapsulated behind this endpoint (invisible to Hermes).
+**Key Changes from Current Setup:**
+- No local models (GLM, Qwen, etc.)
+- No headroom compression or preflight callbacks
+- LiteLLM is used purely as a remote model router with unified OpenAI-compatible interface
+- All API keys and routing logic live in LiteLLM (not exposed to agent pods)
 
 ## 9. Foundational Configuration Standards (Initial Build)
 
@@ -143,12 +143,15 @@ These standards define concrete locations and patterns to ensure consistency and
   - Store the `BWS_ACCESS_TOKEN` in a Kubernetes Secret
   - Mount or inject `BWS_ACCESS_TOKEN` into pods so the existing `bitwarden:` configuration continues to work
   - Project ID (`3d982cf3-3ab1-436d-949d-b45b01802063`) can be included in the mounted `config.yaml`
-- **Inference credentials:** Kept behind the `local-openrouter` endpoint (not exposed directly to Hermes pods)
+- **Inference credentials:** Kept behind the LiteLLM endpoint (not exposed directly to Hermes pods)
 
-### 9.3 Inference Endpoint
-- **Recommended approach:** Deploy the inference endpoint (LiteLLM / local-openrouter) in its own namespace or as a host-accessible service.
-- **Access pattern:** Agents connect via `http://inference.local-openrouter.svc.cluster.local:4200/v1` (or equivalent Service DNS).
-- Since the cluster runs on the same Mac, hostPort or host networking can be used initially for simplicity.
+### 9.3 Inference Endpoint (LiteLLM Router)
+
+- Deploy **LiteLLM** as a central remote-model router in its own namespace (`inference`)
+- LiteLLM handles all remote providers (OpenRouter, Grok, etc.) with a single OpenAI-compatible endpoint
+- Hermes agents connect to: `http://litellm.inference.svc.cluster.local:4000/v1`
+- No local models or headroom logic will be configured for these agents
+- LiteLLM configuration will be minimal and focused on remote routing + load balancing/fallbacks
 
 ### 9.4 Labeling & Naming Conventions
 - Namespace: `hermes-<family-member>`
@@ -159,20 +162,24 @@ These standards define concrete locations and patterns to ensure consistency and
 
 ### 9.5 Resource Defaults (Initial) — 25 GB Total Budget
 
-**Global Constraint:** Plan for a **maximum of ~25 GB RAM** total across all agents + inference endpoint + system overhead.
+**Global Constraint:** Plan for a **maximum of ~25 GB RAM** total across the entire cluster (k3s + system + LiteLLM + MCP servers + all Hermes agents).
 
-**Recommended Starting Allocations:**
+**Recommended Starting Allocations (Remote Inference Only):**
 
 | Component              | Memory Request | Memory Limit | CPU Request | Notes |
 |------------------------|----------------|--------------|-------------|-------|
-| Inference endpoint     | 8–12 Gi        | 14 Gi        | 4–6         | Local models will be the largest consumer |
-| Each Hermes agent      | 1.5–2 Gi       | 3 Gi         | 500m–1      | Conservative but functional |
-| **Max recommended agents** | —           | —            | —           | **Start with 2–4 agents** until usage is measured |
+| k3s + system overhead  | 3–4 Gi         | —            | —           | Kubernetes + OS baseline |
+| LiteLLM (router)       | 1–1.5 Gi       | 2 Gi         | 500m–1      | Remote model routing only |
+| Filesystem MCP         | 512 Mi–1 Gi    | 1.5 Gi       | 250m        | Shared workspace access |
+| Each Hermes agent      | 1–1.5 Gi       | 2 Gi         | 500m–1      | General-purpose personal assistant |
+| **Max recommended agents** | —           | —            | —           | **Start with 6–8 agents** (conservative) |
 
 **Rationale:**
-- Leaves comfortable headroom within the 25 GB total budget
-- Prevents any single agent from starving the inference workload
-- Conservative limits make it easier to add more agents later if actual usage is lower than expected
+- No local models dramatically reduces memory pressure
+- LiteLLM is lightweight when used only for remote routing
+- Leaves reasonable headroom for k3s and future MCP servers
+- Conservative agent limits make it safe to run more agents later if actual usage is low
+- Total stays comfortably under the 25 GB ceiling
 
 ---
 
