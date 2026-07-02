@@ -126,6 +126,43 @@ Hermes expects a custom provider named `local-openrouter` defined in its configu
 - The endpoint can be provided via a Kubernetes Service, external hostname, or sidecar.
 - API keys and model routing details remain encapsulated behind this endpoint (invisible to Hermes).
 
+## 9. Foundational Configuration Standards (Initial Build)
+
+These standards define concrete locations and patterns to ensure consistency and repeatability during the foundational deployment.
+
+### 9.1 Hermes Configuration
+- **Standard path inside container:** `/etc/hermes/config.yaml`
+- **Injection method:** Kubernetes ConfigMap mounted as a file
+- **Per-agent customization:** Use agent-specific ConfigMaps when overrides are needed
+- **Recommendation:** Create a base `hermes-config` ConfigMap and allow per-namespace overrides
+
+### 9.2 Secrets Management
+- **Matrix credentials:** Stored in Kubernetes Secrets (one per agent). Injected as environment variables or mounted files.
+- **Bitwarden integration (current approach):**
+  - Continue using Hermes’ native Bitwarden Secrets support
+  - Store the `BWS_ACCESS_TOKEN` in a Kubernetes Secret
+  - Mount or inject `BWS_ACCESS_TOKEN` into pods so the existing `bitwarden:` configuration continues to work
+  - Project ID (`3d982cf3-3ab1-436d-949d-b45b01802063`) can be included in the mounted `config.yaml`
+- **Inference credentials:** Kept behind the `local-openrouter` endpoint (not exposed directly to Hermes pods)
+
+### 9.3 Inference Endpoint
+- **Recommended approach:** Deploy the inference endpoint (LiteLLM / local-openrouter) in its own namespace or as a host-accessible service.
+- **Access pattern:** Agents connect via `http://inference.local-openrouter.svc.cluster.local:4200/v1` (or equivalent Service DNS).
+- Since the cluster runs on the same Mac, hostPort or host networking can be used initially for simplicity.
+
+### 9.4 Labeling & Naming Conventions
+- Namespace: `hermes-<family-member>`
+- Common labels:
+  - `app.kubernetes.io/name: hermes-agent`
+  - `hermes.family/member: <name>`
+  - `hermes.agent/id: <agent-name>`
+
+### 9.5 Resource Defaults (Initial)
+- Keep agents lightweight:
+  - CPU request: 500m
+  - Memory request: 1Gi
+  - Allow vertical scaling later based on observed usage
+
 ---
 
 **Note:** This is a draft. Family member names should remain as placeholders until execution time. The system is designed to support capable personal assistant behavior with durable context and storage.
