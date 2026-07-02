@@ -110,6 +110,22 @@ Keep MCP usage minimal. Do not introduce a central MCP orchestration layer.
 - Aligns with strong per-agent isolation
 - Keeps the system flexible for future capabilities
 
+## 8. Inference Configuration (Hermes-visible)
+
+Hermes expects a custom provider named `local-openrouter` defined in its configuration. All model calls are made against this provider.
+
+**Required Configuration (from current Hermes setup):**
+- Provider name: `local-openrouter`
+- Base URL: Points to an OpenAI-compatible endpoint (currently `http://127.0.0.1:4200/v1`)
+- Default model alias: `openrouter-primary`
+- Additional model aliases used internally: `openrouter-compact`, `openrouter-summary`, `openrouter-title`, `openrouter-browser-validation`
+- Fallback provider support (currently configured for `xai-oauth` / Grok)
+
+**Kubernetes Implications:**
+- Each agent pod must have access to an equivalent `local-openrouter` endpoint.
+- The endpoint can be provided via a Kubernetes Service, external hostname, or sidecar.
+- API keys and model routing details remain encapsulated behind this endpoint (invisible to Hermes).
+
 ---
 
 **Note:** This is a draft. Family member names should remain as placeholders until execution time. The system is designed to support capable personal assistant behavior with durable context and storage.
